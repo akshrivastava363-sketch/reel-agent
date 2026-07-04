@@ -137,10 +137,11 @@
       <div class="hint">The AI caption generator needs your own Anthropic API key to run outside Claude.ai (this app is now self-hosted, so it can't borrow Claude's built-in connection anymore). Get a key at <span style="color:var(--gold)">console.anthropic.com</span> — cost per generation is a fraction of a cent. Your key stays in your browser only; it's never sent anywhere except directly to Anthropic.</div>
       <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
       <div class="hint" style="margin-top:16px;margin-bottom:8px;">Your session (audio, visuals, script, beats) autosaves to this device so it survives a refresh, crash, or closed tab. This does use some local storage on your device — clear it anytime below.</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <button class="btn ghost small" id="saveDraftBtn">Save session now</button>
         <button class="btn ghost small" id="clearDraftBtn">Clear saved session</button>
-        <span id="autosaveStatus" style="font-family:var(--mono);font-size:10.5px;color:var(--text-dim);"></span>
       </div>
+      <div id="autosaveStatus" style="font-family:var(--mono);font-size:10.5px;color:var(--text-dim);margin-top:8px;"></div>
     </div>
 
     <div class="card">
@@ -235,10 +236,19 @@ async function saveDraft(){
     tx.objectStore(STORE).put(draft, 'draft');
     tx.oncomplete = () => {
       const el = document.getElementById('autosaveStatus');
-      if(el) el.textContent = 'Saved ' + new Date().toLocaleTimeString();
+      if(el){ el.style.color = 'var(--text-dim)'; el.textContent = 'Saved ' + new Date().toLocaleTimeString(); }
     };
-  } catch(e){ console.error('autosave failed', e); }
+    tx.onerror = () => {
+      const el = document.getElementById('autosaveStatus');
+      if(el){ el.style.color = 'var(--danger)'; el.textContent = 'Autosave failed: ' + (tx.error ? tx.error.message : 'unknown error'); }
+    };
+  } catch(e){
+    console.error('autosave failed', e);
+    const el = document.getElementById('autosaveStatus');
+    if(el){ el.style.color = 'var(--danger)'; el.textContent = 'Autosave unavailable — private/incognito browsing blocks this. Use a normal window.'; }
+  }
 }
+document.getElementById('saveDraftBtn').onclick = saveDraft;
 const debouncedSave = debounce(saveDraft, 800);
 
 async function loadDraft(){
@@ -317,6 +327,11 @@ async function applyDraft(draft){
 }
 
 async function initSession(){
+  if(!('indexedDB' in window)){
+    const el = document.getElementById('autosaveStatus');
+    if(el){ el.style.color = 'var(--danger)'; el.textContent = 'This browser does not support session autosave.'; }
+    return;
+  }
   const draft = await loadDraft();
   if(draft) showResumeBanner(draft);
 }
