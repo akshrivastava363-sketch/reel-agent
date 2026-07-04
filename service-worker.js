@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reel-agent-v1';
+const CACHE_NAME = 'reel-agent-v2';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {
@@ -18,11 +18,18 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // App shell: cache-first. Anything else (Anthropic API calls, remote media): network-only.
+  // App shell: network-first so updates always reach installed devices.
+  // Falls back to cache only when offline. Anthropic API / remote media: untouched (network-only).
   const url = new URL(event.request.url);
   if(url.origin === self.location.origin){
     event.respondWith(
-      caches.match(event.request).then(cached => cached || fetch(event.request))
+      fetch(event.request)
+        .then(res => {
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
+          return res;
+        })
+        .catch(() => caches.match(event.request))
     );
   }
 });
