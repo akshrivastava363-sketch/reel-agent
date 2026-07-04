@@ -97,6 +97,16 @@
 
   <div class="stack">
 
+    <div class="card" id="resumeBanner" style="display:none;border-color:var(--gold-dim);">
+      <div class="card-num">—</div>
+      <h2>Unfinished session found</h2>
+      <div class="hint" id="resumeInfo">You have a saved session from a previous visit.</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn primary" id="resumeBtn">Resume it</button>
+        <button class="btn danger" id="discardBtn">Discard & start fresh</button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-num">01</div>
       <h2>Voiceover audio</h2>
@@ -126,6 +136,11 @@
       <h2>Settings</h2>
       <div class="hint">The AI caption generator needs your own Anthropic API key to run outside Claude.ai (this app is now self-hosted, so it can't borrow Claude's built-in connection anymore). Get a key at <span style="color:var(--gold)">console.anthropic.com</span> — cost per generation is a fraction of a cent. Your key stays in your browser only; it's never sent anywhere except directly to Anthropic.</div>
       <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+      <div class="hint" style="margin-top:16px;margin-bottom:8px;">Your session (audio, visuals, script, beats) autosaves to this device so it survives a refresh, crash, or closed tab. This does use some local storage on your device — clear it anytime below.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn ghost small" id="clearDraftBtn">Clear saved session</button>
+        <span id="autosaveStatus" style="font-family:var(--mono);font-size:10.5px;color:var(--text-dim);"></span>
+      </div>
     </div>
 
     <div class="card">
@@ -188,6 +203,124 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const W = canvas.width, H = canvas.height;
 
+// ---------- SESSION AUTOSAVE (IndexedDB) ----------
+const DB_NAME = 'reelAgentDB', STORE = 'draft';
+function openDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function debounce(fn, ms){ let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
+
+async function saveDraft(){
+  try{
+    const db = await openDB();
+    const draft = {
+      savedAt: Date.now(),
+      script: document.getElementById('scriptInput').value,
+      context: document.getElementById('promptInput').value,
+      audioBlob: state.audio.blob || null,
+      audioName: state.audio.name || '',
+      library: state.library.map(l => ({
+        id: l.id, type: l.type, name: l.name,
+        blob: l.blob || null,
+        url: l.blob ? null : l.url
+      })),
+      segments: state.segments
+    };
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(draft, 'draft');
+    tx.oncomplete = () => {
+      const el = document.getElementById('autosaveStatus');
+      if(el) el.textContent = 'Saved ' + new Date().toLocaleTimeString();
+    };
+  } catch(e){ console.error('autosave failed', e); }
+}
+const debouncedSave = debounce(saveDraft, 800);
+
+async function loadDraft(){
+  try{
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get('draft');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch(e){ console.error(e); return null; }
+}
+
+async function clearDraft(){
+  try{
+    const db = await openDB();
+    db.transaction(STORE, 'readwrite').objectStore(STORE).delete('draft');
+  } catch(e){ console.error(e); }
+}
+document.getElementById('clearDraftBtn').onclick = async () => {
+  if(confirm('This clears your saved session from this device. Continue?')){
+    await clearDraft();
+    location.reload();
+  }
+};
+
+function showResumeBanner(draft){
+  const banner = document.getElementById('resumeBanner');
+  banner.style.display = 'block';
+  const savedTime = new Date(draft.savedAt).toLocaleString();
+  const scriptPreview = draft.script ? draft.script.slice(0,60) + (draft.script.length>60?'…':'') : 'no script yet';
+  document.getElementById('resumeInfo').textContent =
+    `Saved ${savedTime} — ${scriptPreview}, ${draft.library.length} visual(s)${draft.audioBlob ? ', voiceover attached' : ''}.`;
+  document.getElementById('resumeBtn').onclick = () => { applyDraft(draft); banner.style.display = 'none'; };
+  document.getElementById('discardBtn').onclick = async () => { await clearDraft(); banner.style.display = 'none'; };
+}
+
+async function applyDraft(draft){
+  document.getElementById('scriptInput').value = draft.script || '';
+  document.getElementById('promptInput').value = draft.context || '';
+
+  let maxId = 0;
+
+  if(draft.audioBlob){
+    state.audio.blob = draft.audioBlob;
+    state.audio.name = draft.audioName;
+    state.audio.el.src = URL.createObjectURL(draft.audioBlob);
+    state.audio.el.onloadedmetadata = () => {
+      state.audio.duration = state.audio.el.duration;
+      state.audio.loaded = true;
+      document.getElementById('audioInfo').style.display = 'block';
+      document.getElementById('audioInfo').textContent = `✓ ${draft.audioName} — ${state.audio.duration.toFixed(1)}s (restored)`;
+      document.getElementById('scrub').max = state.audio.duration;
+      drawAtTime(0);
+    };
+    audioDrop.classList.add('filled');
+    audioDrop.textContent = 'Click to replace audio';
+  }
+
+  (draft.library || []).forEach(item => {
+    maxId = Math.max(maxId, item.id);
+    if(item.blob){
+      addLibraryFromUrl(URL.createObjectURL(item.blob), item.type, item.name, false, item.id, item.blob);
+    } else if(item.url){
+      addLibraryFromUrl(item.url, item.type, item.name, true, item.id);
+    }
+  });
+
+  (draft.segments || []).forEach(s => { maxId = Math.max(maxId, s.id); });
+  state.segments = draft.segments || [];
+  uid = maxId + 1;
+
+  renderSegments();
+  drawAtTime(0);
+}
+
+async function initSession(){
+  const draft = await loadDraft();
+  if(draft) showResumeBanner(draft);
+}
+
 // ---------- AUDIO ----------
 const audioDrop = document.getElementById('audioDrop');
 const audioInput = document.getElementById('audioInput');
@@ -198,6 +331,8 @@ audioDrop.ondrop = e => { e.preventDefault(); handleAudio(e.dataTransfer.files[0
 
 function handleAudio(file){
   if(!file) return;
+  state.audio.blob = file;
+  state.audio.name = file.name;
   state.audio.el.src = URL.createObjectURL(file);
   state.audio.el.onloadedmetadata = () => {
     state.audio.duration = state.audio.el.duration;
@@ -207,6 +342,7 @@ function handleAudio(file){
     document.getElementById('scrub').max = state.audio.duration;
     if(state.segments.length) rescaleSegmentsToAudio();
     drawAtTime(0);
+    saveDraft();
   };
   audioDrop.classList.add('filled');
   audioDrop.textContent = 'Click to replace audio';
@@ -227,11 +363,11 @@ function addLibraryFile(file){
   const isVideo = file.type.startsWith('video');
   librarySizeBytes += file.size;
   if(librarySizeBytes > SIZE_WARN_BYTES){
-    const proceed = confirm(`Your uploaded files now total ~${(librarySizeBytes/1024/1024).toFixed(0)}MB. Everything is held in browser memory (nothing is saved to disk), so very large totals can slow down preview and export. Continue anyway?`);
+    const proceed = confirm(`Your uploaded files now total ~${(librarySizeBytes/1024/1024).toFixed(0)}MB. Everything is held in browser memory and local storage, so very large totals can slow down preview, export, and autosave. Continue anyway?`);
     if(!proceed){ librarySizeBytes -= file.size; return; }
   }
   const url = URL.createObjectURL(file);
-  addLibraryFromUrl(url, isVideo ? 'video' : 'image', file.name, false);
+  addLibraryFromUrl(url, isVideo ? 'video' : 'image', file.name, false, null, file);
 }
 
 document.getElementById('urlAddBtn').onclick = () => {
@@ -241,9 +377,10 @@ document.getElementById('urlAddBtn').onclick = () => {
   addLibraryFromUrl(url, isVideo ? 'video' : 'image', url.split('/').pop().slice(0,30), true);
 };
 
-function addLibraryFromUrl(url, type, name, crossOrigin){
+function addLibraryFromUrl(url, type, name, crossOrigin, explicitId, blob){
   const statusEl = document.getElementById('urlStatus');
-  const item = { id: uid++, type, url, name, el: null, naturalW:0, naturalH:0, naturalDuration:0 };
+  const id = explicitId || uid++;
+  const item = { id, type, url, name, el: null, naturalW:0, naturalH:0, naturalDuration:0, blob: blob || null };
   if(type === 'video'){
     const v = document.createElement('video');
     if(crossOrigin) v.crossOrigin = 'anonymous';
@@ -265,6 +402,7 @@ function addLibraryFromUrl(url, type, name, crossOrigin){
   }
   state.library.push(item);
   renderLibrary();
+  saveDraft();
   if(crossOrigin){ statusEl.textContent = 'Loading…'; document.getElementById('urlInput').value=''; }
 }
 
@@ -279,12 +417,15 @@ function renderLibrary(){
     div.querySelector('.del').onclick = () => {
       state.library = state.library.filter(l => l.id !== item.id);
       state.segments.forEach(s => { if(s.clipId === item.id) s.clipId = null; });
-      renderLibrary(); renderSegments();
+      renderLibrary(); renderSegments(); saveDraft();
     };
     grid.appendChild(div);
   });
   populateAllAssignDropdowns();
 }
+
+document.getElementById('scriptInput').addEventListener('input', debouncedSave);
+document.getElementById('promptInput').addEventListener('input', debouncedSave);
 
 // ---------- SCRIPT -> SEGMENTS (AI) ----------
 document.getElementById('genBtn').onclick = async () => {
@@ -333,6 +474,7 @@ Break the script into 4 to 10 beats depending on its length. Keep beats short �
     rescaleSegmentsToAudio();
     autoAssignVisuals();
     renderSegments();
+    saveDraft();
     status.textContent = `${state.segments.length} beats generated`;
   } catch(err){
     status.textContent = 'Failed: ' + err.message;
@@ -362,7 +504,7 @@ function autoAssignVisuals(){
   if(!state.library.length) return;
   state.segments.forEach((seg, i) => { seg.clipId = state.library[i % state.library.length].id; });
 }
-document.getElementById('reassignBtn').onclick = () => { autoAssignVisuals(); renderSegments(); };
+document.getElementById('reassignBtn').onclick = () => { autoAssignVisuals(); renderSegments(); saveDraft(); };
 
 function renderSegments(){
   const list = document.getElementById('segList');
@@ -401,6 +543,7 @@ function renderSegments(){
       if(f === 'duration'){ seg.duration = Math.max(0.3, parseFloat(inp.value)||1); recomputeSegmentTimes(); renderSegments(); }
       else if(f === 'clipId'){ seg.clipId = inp.value ? parseInt(inp.value) : null; }
       else { seg[f] = inp.value; }
+      debouncedSave();
     };
   });
   populateAllAssignDropdowns();
@@ -559,6 +702,10 @@ document.getElementById('exportBtn').onclick = async () => {
 };
 
 drawAtTime(0);
+initSession();
+setInterval(saveDraft, 20000);
+window.addEventListener('beforeunload', saveDraft);
+window.addEventListener('visibilitychange', () => { if(document.hidden) saveDraft(); });
 
 // ---------- PWA install support ----------
 if('serviceWorker' in navigator){
