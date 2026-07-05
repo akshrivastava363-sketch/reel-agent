@@ -625,7 +625,7 @@ function renderLibrary(){
     const tag = item.type === 'video' ? 'video' : 'img';
     div.innerHTML = `<${tag} src="${item.url}" muted></${tag}><span class="tag">${item.type}</span><button class="del">×</button>`;
     div.querySelector('.del').onclick = async () => {
-      if(!confirm('Remove from this project\\'s assignment? (The file stays in your cloud media library.)')) return;
+      if(!confirm('Remove from this project\'s assignment? (The file stays in your cloud media library.)')) return;
       state.library = state.library.filter(l => l.id !== item.id);
       state.segments.forEach(s => { if(s.clipId === item.id) s.clipId = null; });
       renderLibrary(); renderSegments(); saveProject();
