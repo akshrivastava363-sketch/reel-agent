@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reel-agent-v4';
+const CACHE_NAME = 'reel-agent-v6';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', event => {

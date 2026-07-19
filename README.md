@@ -125,6 +125,71 @@ respectively. `GeminiProvider` implements both today; swapping to a
 different provider later means implementing those two methods on a new
 class, same as `generateSegments()`.
 
+## Saved Reels library
+
+Every exported video is automatically kept in a persistent, on-device
+library — separate from (and in addition to) the file the download button
+saves to your system. It survives a refresh, closing the tab, or reopening
+the installed app on desktop or mobile, using the same IndexedDB database
+as session autosave (a second, dedicated store, so neither one interferes
+with the other).
+
+If cloud sync (below) is connected and you're signed in, every export is
+*also* uploaded to your Supabase project automatically, so it shows up in
+this same list — tagged "this device" or "cloud" — from any device you're
+signed in on.
+
+The library card shows each saved reel with a thumbnail, size, and
+duration, plus Download and Delete actions, an approximate on-device
+storage usage line (via the browser's Storage Estimate API where
+supported), and a "Clear saved reels" bulk action (local reels only —
+cloud reels are deleted individually).
+
+## Cloud sync (cross-device)
+
+Local storage (IndexedDB) keeps everything working per-device, which is
+all this app needs by default. Cloud sync is optional, on top of that, for
+when you genuinely want the same script/captions/exported reels visible on
+both your PC and your phone under one account.
+
+**What syncs to the cloud:** script text, refined voiceover, captions/
+beats, and every exported video file.
+
+**What stays device-only:** the raw audio/images/video clips you upload as
+source material. Re-uploading multi-megabyte source files to the cloud on
+every autosave would be slow and wasteful, so those stay local — you'd
+add them once per device, same as today. This is a deliberate tradeoff,
+not a limitation we plan to lift by default.
+
+### One-time setup
+
+1. Create a free project at **supabase.com** (or use an existing one).
+2. In your project's **SQL Editor**, run the contents of
+   `supabase/schema.sql` (included in this package). This creates:
+   - `reel_drafts` — one row per user, holding script/context/voice/
+     segments, upserted on every autosave.
+   - `reel_videos` — one row per exported video, pointing at its file in
+     Storage.
+   - A public Storage bucket named `reel-agent-files` for the video files
+     themselves, with row-level security so only each user can
+     upload/delete inside their own folder.
+3. In your project's **Settings → API**, copy the **Project URL** and the
+   **anon public key** (not the service_role key — never use that one in
+   a browser app).
+4. In the app, open **Settings → Cloud sync**, paste both in, click
+   **Save connection**.
+5. Enter your email and click **Send sign-in link** — this uses
+   passwordless (magic link) sign-in, no password to manage. Open the
+   emailed link on any device to sign in there too; same email = same
+   account = same synced data.
+
+### How conflicts are handled
+
+On load, the app compares your local saved session against your cloud
+draft (if signed in) and offers to resume whichever is more recent —
+clearly labeled "on this device" or "from the cloud" — never silently
+picks one.
+
 ## Deploying updates
 
 This app is hosted via Netlify with GitHub auto-deploy. To ship a change:
