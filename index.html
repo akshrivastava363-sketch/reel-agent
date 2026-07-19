@@ -80,6 +80,34 @@
   .export-status{margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--text-dim);display:flex;justify-content:space-between;}
   .progress-track{height:2px;background:var(--line);margin-top:6px;}
   .progress-fill{height:100%;background:var(--gold);width:0%;transition:width .1s linear;}
+
+  /* Voice Refinement */
+  .vr-row{display:flex;gap:10px;align-items:center;}
+  .vr-row + .vr-row{margin-top:12px;}
+  .vr-check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);}
+  .vr-check input{width:auto;accent-color:var(--gold);}
+  .intensity-track{display:flex;border:1px solid var(--line);border-radius:2px;overflow:hidden;}
+  .intensity-opt{flex:1;text-align:center;padding:8px 4px;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);cursor:pointer;background:var(--panel-2);border-right:1px solid var(--line);transition:all .15s;}
+  .intensity-opt:last-child{border-right:none;}
+  .intensity-opt.active{background:var(--gold);color:#0a0a0d;}
+  .preset-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .preset-chip{font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;padding:6px 10px;border:1px solid var(--line);border-radius:12px;color:var(--text-dim);cursor:pointer;background:var(--panel-2);transition:all .15s;}
+  .preset-chip:hover{border-color:var(--gold-dim);color:var(--text);}
+  .preset-chip.active{background:var(--gold);color:#0a0a0d;border-color:var(--gold);}
+  .vr-status{font-family:var(--mono);font-size:11.5px;color:var(--gold);margin-top:12px;min-height:16px;opacity:0;transition:opacity .3s;}
+  .vr-status.show{opacity:1;}
+  .vr-compare{margin-top:16px;opacity:0;max-height:0;overflow:hidden;transition:opacity .35s ease, max-height .35s ease;}
+  .vr-compare.show{opacity:1;max-height:2000px;}
+  .vr-panel{margin-top:10px;}
+  .vr-panel-label{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-dim);margin-bottom:6px;}
+  .vr-original-box{background:var(--panel-2);border:1px solid var(--line);padding:12px;font-size:13px;line-height:1.6;color:var(--text-dim);font-style:italic;max-height:160px;overflow-y:auto;}
+  .vr-refined-box{min-height:120px;}
+  .vr-btn-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .vr-active-tag{font-family:var(--mono);font-size:9.5px;color:#7ea87e;margin-top:8px;}
+  .vr-history{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;}
+  .vr-history-item{display:flex;justify-content:space-between;gap:8px;padding:6px 0;font-size:11px;color:var(--text-dim);border-bottom:1px solid var(--line);cursor:pointer;}
+  .vr-history-item:hover{color:var(--text);}
+  .vr-history-item:last-child{border-bottom:none;}
 </style>
 </head>
 <body>
@@ -115,6 +143,80 @@
       <input type="file" id="audioInput" accept="audio/*" style="display:none">
       <div id="audioInfo" class="ok" style="display:none;"></div>
       <audio id="audioEl" style="display:none;"></audio>
+    </div>
+
+    <div class="card" id="voiceRefinementCard">
+      <div class="card-num">—</div>
+      <h2>Voice Refinement</h2>
+      <div class="hint">After your voiceover is uploaded, AI transcribes it and rewrites it into a polished, professional business script — same message, better delivery. Nothing overwrites your script without your say-so.</div>
+
+      <label class="vr-check"><input type="checkbox" id="autoRefineCheck" checked> Auto-refine before generating</label>
+
+      <div class="vr-row" style="margin-top:16px;">
+        <div style="flex:1;">
+          <label>Business tone</label>
+          <select id="toneSelect">
+            <option>Professional Business</option>
+            <option>Startup Founder</option>
+            <option>Corporate HR</option>
+            <option>Sales</option>
+            <option>Marketing</option>
+            <option>CEO</option>
+            <option>Luxury Brand</option>
+            <option>Motivational</option>
+            <option>Educational</option>
+            <option>Storytelling</option>
+            <option>LinkedIn Thought Leadership</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <label>Rewrite intensity</label>
+        <div class="intensity-track" id="intensityTrack">
+          <div class="intensity-opt" data-val="minimal">Minimal</div>
+          <div class="intensity-opt active" data-val="balanced">Balanced</div>
+          <div class="intensity-opt" data-val="strong">Strong Rewrite</div>
+        </div>
+      </div>
+
+      <label style="margin-top:14px;">Quick presets</label>
+      <div class="preset-grid" id="presetGrid">
+        <span class="preset-chip active" data-val="Auto Detect">Auto Detect</span>
+        <span class="preset-chip" data-val="Startup Hiring">Startup Hiring</span>
+        <span class="preset-chip" data-val="HR Consultancy">HR Consultancy</span>
+        <span class="preset-chip" data-val="Business Advice">Business Advice</span>
+        <span class="preset-chip" data-val="Leadership">Leadership</span>
+        <span class="preset-chip" data-val="Sales">Sales</span>
+        <span class="preset-chip" data-val="Recruitment">Recruitment</span>
+        <span class="preset-chip" data-val="Career Tips">Career Tips</span>
+        <span class="preset-chip" data-val="Personal Branding">Personal Branding</span>
+      </div>
+
+      <div class="vr-status" id="vrStatus"></div>
+
+      <div class="vr-compare" id="vrCompare">
+        <div class="vr-panel">
+          <div class="vr-panel-label">Original transcript</div>
+          <div class="vr-original-box" id="vrOriginalBox"></div>
+        </div>
+        <div class="vr-panel">
+          <div class="vr-panel-label">Refined version</div>
+          <textarea id="vrRefinedBox" class="vr-refined-box" rows="6"></textarea>
+        </div>
+        <div class="vr-btn-row">
+          <button class="btn ghost small" id="vrUseOriginalBtn">Use Original</button>
+          <button class="btn primary small" id="vrUseRefinedBtn">Use Refined</button>
+          <button class="btn ghost small" id="vrEditBtn">Edit Manually</button>
+          <button class="btn ghost small" id="vrCopyBtn">Copy</button>
+          <button class="btn ghost small" id="vrRegenerateBtn">Regenerate</button>
+        </div>
+        <div class="vr-active-tag" id="vrActiveTag"></div>
+        <div class="vr-history" id="vrHistory" style="display:none;">
+          <div class="vr-panel-label">History</div>
+          <div id="vrHistoryList"></div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -212,6 +314,14 @@ class AIProvider {
   // eslint-disable-next-line no-unused-vars
   async generateSegments(script, context){
     throw new Error('generateSegments() not implemented');
+  }
+  // eslint-disable-next-line no-unused-vars
+  async transcribeAudio(audioBlob){
+    throw new Error('transcribeAudio() not implemented');
+  }
+  // eslint-disable-next-line no-unused-vars
+  async refineTranscript(transcript, options){
+    throw new Error('refineTranscript() not implemented');
   }
 }
 
@@ -318,6 +428,123 @@ Break the script into 4 to 10 beats depending on its length. Keep beats short �
     }
     return parsed;
   }
+
+  // ---- Voice Refinement: transcription ----
+  static blobToBase64(blob){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async callModelWithAudio(model, audioBase64, mimeType, instruction){
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+    let res;
+    try{
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { inline_data: { mime_type: mimeType, data: audioBase64 } },
+            { text: instruction }
+          ] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+        })
+      });
+    } catch(networkErr){
+      throw new ProviderError(0, 'network_error');
+    }
+    if(!res.ok){
+      let raw = '';
+      try{ const errJson = await res.json(); raw = (errJson.error && errJson.error.message) || ''; } catch(e){ /* ignore */ }
+      throw new ProviderError(res.status, raw);
+    }
+    const data = await res.json();
+    const candidate = data.candidates && data.candidates[0];
+    const parts = candidate && candidate.content && candidate.content.parts;
+    const text = parts ? parts.map(p => p.text || '').join('') : '';
+    if(!text.trim()) throw new ProviderError(0, 'empty_response');
+    return text.trim();
+  }
+
+  async transcribeAudio(audioBlob){
+    const MAX_INLINE_BYTES = 18 * 1024 * 1024; // stay under Gemini's inline request limit
+    if(audioBlob.size > MAX_INLINE_BYTES){
+      throw new ProviderError(0, 'audio_too_large');
+    }
+    const base64 = await GeminiProvider.blobToBase64(audioBlob);
+    const mimeType = audioBlob.type || 'audio/mpeg';
+    const instruction = 'Transcribe this audio recording verbatim, word for word, exactly as spoken, including filler words and false starts. Return ONLY the transcript text — no commentary, no timestamps, no speaker labels, no formatting.';
+    try{
+      return await this.callModelWithAudio(this.primaryModel, base64, mimeType, instruction);
+    } catch(err){
+      const notFound = err.status === 404 || /not found|unsupported/i.test(err.raw || '');
+      if(notFound) return await this.callModelWithAudio(this.fallbackModel, base64, mimeType, instruction);
+      throw err;
+    }
+  }
+
+  // ---- Voice Refinement: rewrite ----
+  static refinementSystemPrompt(){
+    return `You are a world-class business copywriter, startup advisor, and viral content strategist.
+
+Rewrite this voiceover transcript into a polished, professional business voiceover suitable for Instagram Reels and LinkedIn.
+
+Maintain the original meaning.
+Do not invent facts.
+Improve clarity.
+Improve authority.
+Improve confidence.
+Improve storytelling.
+Remove filler words.
+Remove grammatical errors.
+Create a stronger opening hook.
+Increase audience retention.
+Keep sentences short and natural.
+End with an appropriate CTA if relevant.
+Return only the rewritten transcript.`;
+  }
+
+  static intensityInstruction(intensity){
+    if(intensity === 'minimal') return 'Rewrite intensity: MINIMAL. Fix grammar and remove filler words only. Preserve the original sentence structure and wording as closely as possible — do not restructure or embellish.';
+    if(intensity === 'strong') return 'Rewrite intensity: STRONG. Maximize engagement, retention, and persuasion. Restructure sentences freely for maximum impact while preserving every fact and the original message.';
+    return 'Rewrite intensity: BALANCED. A professional rewrite — improve clarity, flow, and confidence while keeping the structure recognizable.';
+  }
+
+  async refineTranscript(transcript, options){
+    const { style, intensity, preset } = options || {};
+    let promptText = GeminiProvider.refinementSystemPrompt();
+    promptText += `\n\n${GeminiProvider.intensityInstruction(intensity)}`;
+    if(style) promptText += `\n\nTone: ${style}.`;
+    if(preset && preset !== 'Auto Detect') promptText += `\n\nTopic focus: ${preset}.`;
+    promptText += `\n\nTranscript:\n${transcript}`;
+
+    const first = await this.runWithFallback(promptText);
+    return GeminiProvider.cleanJsonText(first.text).replace(/^["']|["']$/g, '').trim();
+  }
+}
+
+/* =========================================================================
+   PIPELINE SERVICES
+   Each service depends only on the abstract AIProvider interface, not on
+   Gemini specifically — future features (or a future provider swap) plug
+   into this same pipeline: Voice Upload -> TranscriptionService ->
+   RefinementService -> CaptionGenerationService (generateSegments) ->
+   Timeline -> Export. Existing timeline/export code is untouched; it just
+   reads whatever text ends up in the script field.
+   ========================================================================= */
+
+class TranscriptionService {
+  constructor(provider){ this.provider = provider; }
+  async transcribe(audioBlob){ return this.provider.transcribeAudio(audioBlob); }
+}
+
+class RefinementService {
+  constructor(provider){ this.provider = provider; }
+  async refine(transcript, options){ return this.provider.refineTranscript(transcript, options); }
 }
 
 // Maps any provider error into a short, readable message for the UI.
@@ -325,6 +552,7 @@ function friendlyError(err){
   const status = err && err.status;
   const raw = ((err && err.raw) || (err && err.message) || '').toLowerCase();
 
+  if(raw.includes('audio_too_large')) return 'Audio file is too large to transcribe';
   if(status === 400 && raw.includes('api key')) return 'Invalid API key';
   if(status === 401 || status === 403 || raw.includes('api key') || raw.includes('permission')) return 'Invalid API key';
   if(status === 429 && raw.includes('daily')) return 'Daily limit reached';
@@ -342,7 +570,17 @@ const state = {
   audio: { el: document.getElementById('audioEl'), duration: 0, loaded: false },
   library: [],   // {id,type,url,el,name,naturalW,naturalH,naturalDuration,blob}
   segments: [],  // {id,spoken,caption,weight,duration,start,end,keyword,clipId,position,size}
-  playing: false
+  playing: false,
+  voice: {
+    originalTranscript: '',
+    refinedTranscript: '',
+    style: 'Professional Business',
+    intensity: 'balanced',
+    preset: 'Auto Detect',
+    autoRefine: true,
+    activeChoice: null, // 'original' | 'refined' | null
+    history: []          // {original, refined, timestamp, style, intensity}
+  }
 };
 let uid = 1;
 const canvas = document.getElementById('canvas');
@@ -379,7 +617,17 @@ async function saveDraft(){
         blob: l.blob || null,
         url: l.blob ? null : l.url
       })),
-      segments: state.segments
+      segments: state.segments,
+      voice: {
+        originalTranscript: state.voice.originalTranscript,
+        refinedTranscript: state.voice.refinedTranscript,
+        style: state.voice.style,
+        intensity: state.voice.intensity,
+        preset: state.voice.preset,
+        autoRefine: state.voice.autoRefine,
+        activeChoice: state.voice.activeChoice,
+        history: state.voice.history
+      }
     };
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put(draft, 'draft');
@@ -471,6 +719,35 @@ async function applyDraft(draft){
   state.segments = draft.segments || [];
   uid = maxId + 1;
 
+  if(draft.voice){
+    state.voice.originalTranscript = draft.voice.originalTranscript || '';
+    state.voice.refinedTranscript = draft.voice.refinedTranscript || '';
+    state.voice.style = draft.voice.style || 'Professional Business';
+    state.voice.intensity = draft.voice.intensity || 'balanced';
+    state.voice.preset = draft.voice.preset || 'Auto Detect';
+    state.voice.autoRefine = draft.voice.autoRefine !== false;
+    state.voice.activeChoice = draft.voice.activeChoice || null;
+    state.voice.history = draft.voice.history || [];
+
+    document.getElementById('autoRefineCheck').checked = state.voice.autoRefine;
+    document.getElementById('toneSelect').value = state.voice.style;
+    document.querySelectorAll('#intensityTrack .intensity-opt').forEach(o => {
+      o.classList.toggle('active', o.dataset.val === state.voice.intensity);
+    });
+    document.querySelectorAll('#presetGrid .preset-chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.val === state.voice.preset);
+    });
+    if(state.voice.originalTranscript){
+      document.getElementById('vrOriginalBox').textContent = state.voice.originalTranscript;
+      document.getElementById('vrRefinedBox').value = state.voice.refinedTranscript;
+      showVrCompare();
+      const tag = document.getElementById('vrActiveTag');
+      if(state.voice.activeChoice === 'original') tag.textContent = '✓ Using original transcript as script';
+      else if(state.voice.activeChoice === 'refined') tag.textContent = '✓ Using refined version as script';
+    }
+    renderVrHistory();
+  }
+
   renderSegments();
   drawAtTime(0);
 }
@@ -507,6 +784,7 @@ function handleAudio(file){
     if(state.segments.length) rescaleSegmentsToAudio();
     drawAtTime(0);
     saveDraft();
+    if(state.voice.autoRefine) runVoiceRefinementPipeline();
   };
   audioDrop.classList.add('filled');
   audioDrop.textContent = 'Click to replace audio';
@@ -587,6 +865,167 @@ function renderLibrary(){
   });
   populateAllAssignDropdowns();
 }
+
+// ---------- VOICE REFINEMENT ----------
+const autoRefineCheck = document.getElementById('autoRefineCheck');
+autoRefineCheck.checked = state.voice.autoRefine;
+autoRefineCheck.onchange = () => { state.voice.autoRefine = autoRefineCheck.checked; debouncedSave(); };
+
+const toneSelect = document.getElementById('toneSelect');
+toneSelect.value = state.voice.style;
+toneSelect.onchange = () => { state.voice.style = toneSelect.value; debouncedSave(); };
+
+document.querySelectorAll('#intensityTrack .intensity-opt').forEach(opt => {
+  opt.onclick = () => {
+    document.querySelectorAll('#intensityTrack .intensity-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    state.voice.intensity = opt.dataset.val;
+    debouncedSave();
+  };
+});
+
+document.querySelectorAll('#presetGrid .preset-chip').forEach(chip => {
+  chip.onclick = () => {
+    document.querySelectorAll('#presetGrid .preset-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.voice.preset = chip.dataset.val;
+    debouncedSave();
+  };
+});
+
+function setVrStatus(msg){
+  const el = document.getElementById('vrStatus');
+  el.textContent = msg;
+  el.classList.toggle('show', !!msg);
+}
+
+function showVrCompare(){
+  document.getElementById('vrCompare').classList.add('show');
+}
+
+function renderVrHistory(){
+  const wrap = document.getElementById('vrHistory');
+  const list = document.getElementById('vrHistoryList');
+  if(!state.voice.history.length){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = '';
+  state.voice.history.slice().reverse().forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'vr-history-item';
+    const time = new Date(entry.timestamp).toLocaleTimeString();
+    row.innerHTML = `<span>${time} · ${entry.style} · ${entry.intensity}</span><span>restore</span>`;
+    row.onclick = () => {
+      document.getElementById('vrRefinedBox').value = entry.refined;
+      document.getElementById('vrOriginalBox').textContent = entry.original;
+      state.voice.originalTranscript = entry.original;
+      state.voice.refinedTranscript = entry.refined;
+      showVrCompare();
+    };
+    list.appendChild(row);
+  });
+}
+
+function addVrHistoryEntry(){
+  state.voice.history.push({
+    original: state.voice.originalTranscript,
+    refined: state.voice.refinedTranscript,
+    timestamp: Date.now(),
+    style: state.voice.style,
+    intensity: state.voice.intensity
+  });
+  if(state.voice.history.length > 10) state.voice.history.shift();
+  renderVrHistory();
+}
+
+function getRefinementOptions(){
+  return { style: state.voice.style, intensity: state.voice.intensity, preset: state.voice.preset };
+}
+
+async function runVoiceRefinementPipeline(){
+  const apiKey = apiKeyInput.value.trim();
+  if(!apiKey){
+    setVrStatus('Add your Gemini API key in Settings to enable Voice Refinement.');
+    return;
+  }
+  if(!state.audio.blob){
+    setVrStatus('Upload your voiceover first.');
+    return;
+  }
+
+  const provider = new GeminiProvider(apiKey);
+  const transcription = new TranscriptionService(provider);
+  const refinement = new RefinementService(provider);
+
+  try{
+    setVrStatus('Analyzing voice…');
+    const transcript = await transcription.transcribe(state.audio.blob);
+    state.voice.originalTranscript = transcript;
+    document.getElementById('vrOriginalBox').textContent = transcript;
+
+    setVrStatus('Improving script…');
+    const refined = await refinement.refine(transcript, getRefinementOptions());
+
+    setVrStatus('Optimizing for engagement…');
+    state.voice.refinedTranscript = refined;
+    document.getElementById('vrRefinedBox').value = refined;
+
+    addVrHistoryEntry();
+    showVrCompare();
+    applyVoiceChoice('refined');
+    setVrStatus('Done');
+    saveDraft();
+  } catch(err){
+    setVrStatus(friendlyError(err));
+    console.error(err);
+  }
+}
+
+function applyVoiceChoice(which){
+  state.voice.activeChoice = which;
+  const tag = document.getElementById('vrActiveTag');
+  if(which === 'original'){
+    document.getElementById('scriptInput').value = state.voice.originalTranscript;
+    tag.textContent = '✓ Using original transcript as script';
+  } else {
+    document.getElementById('scriptInput').value = document.getElementById('vrRefinedBox').value;
+    tag.textContent = '✓ Using refined version as script';
+  }
+  saveDraft();
+}
+
+document.getElementById('vrUseOriginalBtn').onclick = () => applyVoiceChoice('original');
+document.getElementById('vrUseRefinedBtn').onclick = () => applyVoiceChoice('refined');
+document.getElementById('vrEditBtn').onclick = () => { document.getElementById('vrRefinedBox').focus(); };
+document.getElementById('vrCopyBtn').onclick = () => {
+  navigator.clipboard.writeText(document.getElementById('vrRefinedBox').value).catch(()=>{});
+};
+document.getElementById('vrRegenerateBtn').onclick = async () => {
+  const apiKey = apiKeyInput.value.trim();
+  if(!apiKey){ setVrStatus('Add your Gemini API key in Settings first.'); return; }
+  if(!state.voice.originalTranscript){ setVrStatus('Nothing to regenerate yet — upload audio first.'); return; }
+  const btn = document.getElementById('vrRegenerateBtn');
+  btn.disabled = true;
+  try{
+    setVrStatus('Improving script…');
+    const provider = new GeminiProvider(apiKey);
+    const refinement = new RefinementService(provider);
+    const refined = await refinement.refine(state.voice.originalTranscript, getRefinementOptions());
+    state.voice.refinedTranscript = refined;
+    document.getElementById('vrRefinedBox').value = refined;
+    addVrHistoryEntry();
+    if(state.voice.activeChoice === 'refined' || !state.voice.activeChoice) applyVoiceChoice('refined');
+    setVrStatus('Done');
+    saveDraft();
+  } catch(err){
+    setVrStatus(friendlyError(err));
+    console.error(err);
+  }
+  btn.disabled = false;
+};
+document.getElementById('vrRefinedBox').addEventListener('input', () => {
+  state.voice.refinedTranscript = document.getElementById('vrRefinedBox').value;
+  debouncedSave();
+});
 
 // ---------- SCRIPT -> SEGMENTS (AI, via AIProvider) ----------
 document.getElementById('scriptInput').addEventListener('input', debouncedSave);

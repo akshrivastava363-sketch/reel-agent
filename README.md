@@ -79,6 +79,52 @@ assignment, export, preview, autosave/resume (IndexedDB), and PWA
 installability on desktop and mobile all work exactly as before — only the
 AI backend changed.
 
+## AI Voice Refinement
+
+After a voiceover is uploaded, the app automatically:
+1. **Transcribes** the audio verbatim (Gemini's audio understanding — no
+   separate speech-to-text service needed).
+2. **Refines** the transcript into a polished, professional business
+   voiceover — same meaning and facts, better delivery, stronger hook,
+   tighter sentences, and an appropriate CTA where relevant.
+
+Nothing is silently replaced: a comparison view shows the original next to
+the refined version, with **Use Original**, **Use Refined**, **Edit
+Manually**, **Copy**, and **Regenerate** controls. Whichever version you
+choose becomes the text in the existing Script field — the rest of the
+pipeline (beat generation, timeline, export) is completely unaware anything
+changed upstream.
+
+Controls:
+- **Auto-refine before generating** (checkbox, on by default) — turn off to
+  keep your exact wording and skip refinement entirely.
+- **Business tone** — Professional Business, Startup Founder, Corporate HR,
+  Sales, Marketing, CEO, Luxury Brand, Motivational, Educational,
+  Storytelling, LinkedIn Thought Leadership.
+- **Rewrite intensity** — Minimal (grammar only), Balanced (professional
+  rewrite, default), Strong Rewrite (maximum engagement).
+- **Quick presets** — topic hints like Startup Hiring, HR Consultancy,
+  Recruitment, etc., or Auto Detect.
+- **History** — the last 10 refinements (original, refined, timestamp,
+  tone, intensity) are saved and restorable with one click.
+
+### Architecture
+
+Built as an independent pipeline, matching the rest of the app's
+`AIProvider` pattern:
+
+```
+Voice Upload → TranscriptionService → RefinementService →
+generateSegments() (caption/beat generation) → Timeline → Export
+```
+
+`TranscriptionService` and `RefinementService` are thin wrappers around the
+same `AIProvider` interface used for beat generation — they call
+`provider.transcribeAudio()` and `provider.refineTranscript()`
+respectively. `GeminiProvider` implements both today; swapping to a
+different provider later means implementing those two methods on a new
+class, same as `generateSegments()`.
+
 ## Deploying updates
 
 This app is hosted via Netlify with GitHub auto-deploy. To ship a change:
